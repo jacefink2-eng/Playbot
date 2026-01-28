@@ -4,11 +4,13 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 import ffmpeg
 from datetime import datetime
-from io import BytesIO
+import folium
+import io
+from selenium import webdriver
 
 # ---------------- SETTINGS ----------------
 WIDTH, HEIGHT = 1280, 720
-FPS = 60
+FPS = 5
 YOUTUBE_STREAM_KEY = ""
 YOUTUBE_URL = f"rtmp://a.rtmp.youtube.com/live2/fvgb-pzbe-4j7g-vej0-6g7q"
 
@@ -154,69 +156,37 @@ def fetch_noaa_alerts():
     alerts.sort(key=lambda x: x["severity"], reverse=True)
     return alerts
 
-# ---------------- HELPER: Convert lat/lon to tile numbers ----------------
-def deg2num(lat_deg, lon_deg, zoom):
-    lat_rad = math.radians(lat_deg)
-    n = 2.0 ** zoom
-    xtile = int((lon_deg + 180.0) / 360.0 * n)
-    ytile = int((1.0 - math.log(math.tan(lat_rad) + 1 / math.cos(lat_rad)) / math.pi) / 2.0 * n)
-    return xtile, ytile
-
-# ---------------- FETCH TILE ----------------
-def fetch_tile(x, y, zoom=6):
-    url = f"https://a.tile.openstreetmap.org/{zoom}/{x}/{y}.png"
-    resp = requests.get(url, timeout=5)
-    tile = Image.open(resp.raw).convert("RGB")
-    return tile
-
-# ---------------- BUILD MAP ----------------
-def build_map_image(width=250, height=160, center_lat=40.0, center_lon=-100.0, zoom=6):
-    """
-    Build a map overlay by stitching OSM tiles.
-    """
-    cx, cy = deg2num(center_lat, center_lon, zoom)
-    tiles = []
-    for dx in range(2):  # 2x2 tiles
-        for dy in range(2):
-            tiles.append(fetch_tile(cx+dx, cy+dy, zoom))
-
-    map_img = Image.new("RGB", (512, 512))
-    for i, tile in enumerate(tiles):
-        x = (i % 2) * 256
-        y = (i // 2) * 256
-        map_img.paste(tile, (x, y))
-
-    map_img = map_img.resize((width, height))
-    return map_img
-
-# ---------------- DRAW ALERT MARKERS ----------------
-def latlon_to_pixel(lat, lon, img_width, img_height, bounds):
-    min_lat, max_lat, min_lon, max_lon = bounds
-    x = int((lon - min_lon) / (max_lon - min_lon) * img_width)
-    y = int((max_lat - lat) / (max_lat - min_lat) * img_height)
-    return x, y
-
-def add_alert_markers(map_img, alerts):
-    bounds = (24.0, 50.0, -125.0, -66.0)  # continental USA approx
-    draw = ImageDraw.Draw(map_img)
-    for a in alerts:
-        area = a['area']
-        color = (255,0,0) if "Warning" in a['event'] else (255,140,0)
-        # Approx coordinates
-        if "Oregon" in area or "Washington" in area:
-            x, y = latlon_to_pixel(46.0, -120.5, map_img.width, map_img.height, bounds)
-        elif "South Dakota" in area:
-            x, y = latlon_to_pixel(44.5, -99.5, map_img.width, map_img.height, bounds)
-        elif "North Dakota" in area:
-            x, y = latlon_to_pixel(47.5, -100.5, map_img.width, map_img.height, bounds)
-        elif "Minnesota" in area:
-            x, y = latlon_to_pixel(46.5, -93.0, map_img.width, map_img.height, bounds)
-        else:
-            continue
-        draw.ellipse((x-6, y-6, x+6, y+6), fill=color)
-    return map_img
 
 # ---------------- UPDATED DRAW FRAME ----------------
+def generate_map_image(alerts):
+    # Center map on USA
+    m = folium.Map(location=[39.8283, -98.5795], zoom_start=4)
+
+    # Example: overlay rectangles for alerts
+    for a in alerts:
+        if "Oregon" in a["area"]:
+            folium.Rectangle(bounds=[[42,-124],[46,-116]],
+                             color="red", fill=True, fill_opacity=0.5).add_to(m)
+        if "South Dakota" in a["area"]:
+            folium.Rectangle(bounds=[[43,-104],[46,-96]],
+                             color="orange", fill=True, fill_opacity=0.5).add_to(m)
+
+    # Save map as HTML
+    m.save("map.html")
+
+    # Render HTML to image using headless browser
+    options = webdriver.ChromeOptions()
+    options.headless = True
+    options.add_argument("--window-size=1280,720")
+    driver = webdriver.Chrome(options=options)
+    driver.get("file://" + os.path.abspath("map.html"))
+    driver.save_screenshot("map.png")
+    driver.quit()
+
+    img = Image.open("map.png").resize((WIDTH, HEIGHT))
+    return np.array(img)
+
+
 def draw_frame(alerts, ticker_x):
     frame = np.zeros((HEIGHT, WIDTH, 3), dtype=np.uint8)
     pil = Image.fromarray(frame)
