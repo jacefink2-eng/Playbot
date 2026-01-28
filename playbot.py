@@ -75,7 +75,7 @@ def start_stream():
         format="lavfi"
     )
 
-    return (
+    stream = (
         ffmpeg
         .output(
             video,
@@ -87,11 +87,19 @@ def start_stream():
             acodec="aac",
             audio_bitrate="128k",
             preset="veryfast",
-            g=FPS * 2
+            g=FPS * 2,
+            r=FPS,
+            vsync="cfr"
         )
         .overwrite_output()
         .run_async(pipe_stdin=True)
     )
+
+    # 🔴 Kick YouTube out of "No data"
+    stream.stdin.write(np.zeros((HEIGHT, WIDTH, 3), dtype=np.uint8).tobytes())
+
+    return stream
+
 
 
 # ---------------- FETCH NOAA ALERTS ----------------
