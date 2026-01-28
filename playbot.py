@@ -4,7 +4,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 import ffmpeg
 from datetime import datetime
-from staticmap import StaticMap, CircleMarker
+from io import BytesIO
 
 # ---------------- SETTINGS ----------------
 WIDTH, HEIGHT = 1280, 720
@@ -168,43 +168,93 @@ def fetch_noaa_alerts():
     return alerts
 
 # ---------------- DRAW FRAME ----------------
-# ---------------- DRAW FRAME ----------------
-# ---------------- DRAW FRAME (FULL DYNAMIC) ----------------
+def build_map_image(center_lat=40.0, center_lon=-100.0, zoom=6, width=250, height=160):
+    cx, cy = deg2num(center_lat, center_lon, zoom)
+    tiles = []
+    for dx in range(2):  # 2x2 tiles horizontally
+        for dy in range(2):  # 2x2 tiles vertically
+            tile = fetch_tile(cx+dx, cy+dy, zoom)
+            tiles.append(tile)
+
+    # Combine tiles
+    map_img = Image.new('RGB', (512, 512))  # 256px tiles × 2
+    for i, tile in enumerate(tiles):
+        x = (i % 2) * 256
+        y = (i // 2) * 256
+        map_img.paste(tile, (x, y))
+
+    # Resize to desired overlay size
+    map_img = map_img.resize((width, height))
+    return map_img
+    def latlon_to_pixel(lat, lon, img_width, img_height, bounds):
+    """Convert lat/lon to pixel coords within the map image"""
+    min_lat, max_lat, min_lon, max_lon = bounds
+    x = int((lon - min_lon) / (max_lon - min_lon) * img_width)
+    y = int((max_lat - lat) / (max_lat - min_lat) * img_height)
+    return x, y
+
+def add_alert_markers(map_img, alerts):
+    # Define rough bounds of map (USA)
+    bounds = (24.0, 50.0, -125.0, -66.0)  # min_lat, max_lat, min_lon, max_lon
+
+    draw = ImageDraw.Draw(map_img)
+    for a in alerts:
+        area = a['area']
+        color = (255,0,0) if "Warning" in a['event'] else (255,140,0)
+
+        # Example coordinates for regions
+        if "Oregon" in area or "Washington" in area:
+            x, y = latlon_to_pixel(46.0, -120.5, map_img.width, map_img.height, bounds)
+        elif "South Dakota" in area:
+            x, y = latlon_to_pixel(44.5, -99.5, map_img.width, map_img.height, bounds)
+        elif "North Dakota" in area:
+            x, y = latlon_to_pixel(47.5, -100.5, map_img.width, map_img.height, bounds)
+        elif "Minnesota" in area:
+            x, y = latlon_to_pixel(46.5, -93.0, map_img.width, map_img.height, bounds)
+        else:
+            continue
+
+        # Draw circle for alert
+        draw.ellipse((x-6, y-6, x+6, y+6), fill=color)
+
+    return map_img
+
 def draw_frame(alerts, ticker_x):
     frame = np.zeros((HEIGHT, WIDTH, 3), dtype=np.uint8)
     pil = Image.fromarray(frame)
     draw = ImageDraw.Draw(pil)
 
-    # ---------------- HEADER ----------------
-    draw.rectangle((0, 0, WIDTH, 40), fill=(0, 0, 0))
-    draw.text((10, 5), "PlayBot 24/7 USA Weather Alerts", font=FONT_LARGE, fill=(255,255,255))
+    # HEADER
+    draw.rectangle((0,0,WIDTH,40), fill=(0,0,0))
+    draw.text((10,5),"PlayBot 24/7 USA Weather Alerts", font=FONT_LARGE, fill=(255,255,255))
 
-    # ---------------- TOP ALERT BANNER ----------------
+    # TOP ALERT
     if alerts:
         top = alerts[0]
-        color = (255,0,0) if "Warning" in top["event"] else (255,140,0)
-        draw.rectangle((0, 50, WIDTH, 100), fill=color)
-        draw.text((10, 55), f"{top['event']} — {top['area']}", font=FONT_MED, fill=(0,0,0))
+        color = (255,0,0) if "Warning" in top['event'] else (255,140,0)
+        draw.rectangle((0,50,WIDTH,100), fill=color)
+        draw.text((10,55), f"{top['event']} — {top['area']}", font=FONT_MED, fill=(0,0,0))
 
-    # ---------------- ACTIVE ALERTS BOX ----------------
-    draw.rectangle((WIDTH-280, 110, WIDTH-10, 270), fill=(20,20,20))
-    draw.text((WIDTH-270, 120), "Active Alerts", font=FONT_MED, fill=(255,255,255))
-
+    # ACTIVE ALERTS BOX
+    draw.rectangle((WIDTH-280,110,WIDTH-10,270), fill=(20,20,20))
+    draw.text((WIDTH-270,120),"Active Alerts", font=FONT_MED, fill=(255,255,255))
     y = 155
     for a in alerts[:6]:
-        draw.text((WIDTH-270, y), a["event"], font=FONT_SMALL, fill=(255,0,0))
+        draw.text((WIDTH-270,y),a['event'], font=FONT_SMALL, fill=(255,0,0))
         y += 24
 
-    # ---------------- DYNAMIC MAP OVERLAY ----------------
-    map_img = generate_map_image(alerts, width=250, height=160)  # map updates every frame
-    pil.paste(map_img, (WIDTH-270, 280))
+    # MAP OVERLAY (tiles + markers)
+    map_img = build_map_image(width=250, height=160)
+    map_img = add_alert_markers(map_img, alerts)
+    pil.paste(map_img,(WIDTH-270,280))
 
-    # ---------------- SCROLLING TICKER ----------------
+    # TICKER
     crawl = " | ".join([f"{a['event']} - {a['area']}" for a in alerts])
-    draw.rectangle((0, HEIGHT-60, WIDTH, HEIGHT), fill=(0,0,0))
+    draw.rectangle((0,HEIGHT-60,WIDTH,HEIGHT), fill=(0,0,0))
     draw.text((ticker_x, HEIGHT-45), crawl, font=FONT_MED, fill=(255,0,0))
 
     return np.array(pil), len(crawl)*12
+
 
 
 
