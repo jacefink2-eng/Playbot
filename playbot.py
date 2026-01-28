@@ -169,6 +169,7 @@ def fetch_noaa_alerts():
 
 # ---------------- DRAW FRAME ----------------
 # ---------------- DRAW FRAME ----------------
+# ---------------- DRAW FRAME (FULL DYNAMIC) ----------------
 def draw_frame(alerts, ticker_x):
     frame = np.zeros((HEIGHT, WIDTH, 3), dtype=np.uint8)
     pil = Image.fromarray(frame)
@@ -178,7 +179,7 @@ def draw_frame(alerts, ticker_x):
     draw.rectangle((0, 0, WIDTH, 40), fill=(0, 0, 0))
     draw.text((10, 5), "PlayBot 24/7 USA Weather Alerts", font=FONT_LARGE, fill=(255,255,255))
 
-    # ---------------- TOP ALERT ----------------
+    # ---------------- TOP ALERT BANNER ----------------
     if alerts:
         top = alerts[0]
         color = (255,0,0) if "Warning" in top["event"] else (255,140,0)
@@ -194,8 +195,8 @@ def draw_frame(alerts, ticker_x):
         draw.text((WIDTH-270, y), a["event"], font=FONT_SMALL, fill=(255,0,0))
         y += 24
 
-    # ---------------- MAP ----------------
-    map_img = generate_map_image(alerts, width=250, height=160)
+    # ---------------- DYNAMIC MAP OVERLAY ----------------
+    map_img = generate_map_image(alerts, width=250, height=160)  # map updates every frame
     pil.paste(map_img, (WIDTH-270, 280))
 
     # ---------------- SCROLLING TICKER ----------------
@@ -204,6 +205,7 @@ def draw_frame(alerts, ticker_x):
     draw.text((ticker_x, HEIGHT-45), crawl, font=FONT_MED, fill=(255,0,0))
 
     return np.array(pil), len(crawl)*12
+
 
 
 # ---------------- MAIN LOOP ----------------
