@@ -117,47 +117,29 @@ def fetch_noaa_alerts():
 
 # ------------------ DRAW FRAME ------------------
 def draw_frame(alerts, ticker_x):
-    frame = np.zeros((HEIGHT, WIDTH, 3), dtype=np.uint8)
-    img = Image.fromarray(frame)
-    draw = ImageDraw.Draw(img)
+    # ... (previous code)
+    
+    # Title bar
+    draw.text((10,5), "playBot 24/7 USA Weather Alerts", font=FONT_LARGE, fill=(255,255,255))
 
-    # HEADER
-    draw.rectangle((0,0,WIDTH,40), fill=(0,0,0))
-    draw.text((10,5), "PlayBot 24/7 USA Weather Alerts", font=FONT_LARGE, fill=(255,255,255))
-
-    # TOP ALERT
+    # Top alert box
     if alerts:
         top = alerts[0]
-        color = (255,0,0) if "Warning" in top["event"] else (255,165,0)
-        draw.rectangle((0,50,WIDTH,100), fill=color)
-        draw.text((10,58), f"{top['event']} — {top['area']}", FONT_MED, fill=(0,0,0))
+        # ...
+        draw.text((10,55), f"{top['event']} — {top['area']}", font=FONT_MED, fill=(0,0,0))
 
-    # SIDE LIST
-    draw.rectangle((WIDTH-300,110,WIDTH-10,320), fill=(20,20,20))
-    draw.text((WIDTH-290,120), "Active Alerts", FONT_MED, fill=(255,255,255))
+    # Side panel
     y = 155
-    for a in alerts[:7]:
-        draw.text((WIDTH-290,y), a["event"], FONT_SMALL, fill=(255,0,0))
-        y += 22
+    for a in alerts[:6]:
+        draw.text((WIDTH-270,y), a["event"], font=FONT_SMALL, fill=(255,0,0))
+        y += 24
 
-    # MAP PLACEHOLDER
-    draw.rectangle((50,120,700,500), fill=(30,30,60))
+    # Ticker
+    crawl = " | ".join([f"{a['event']} - {a['area']}" for a in alerts]) if alerts else "No active alerts."
+    draw.text((ticker_x, HEIGHT-45), crawl, font=FONT_MED, fill=(255,0,0))
 
-    for a in alerts:
-        area = a["area"].lower()
-        if "oregon" in area:
-            draw.rectangle((100,180,200,280), fill=(255,0,0))
-        if "washington" in area:
-            draw.rectangle((100,140,200,180), fill=(255,0,0))
-        if "dakota" in area or "minnesota" in area:
-            draw.rectangle((300,220,420,320), fill=(255,165,0))
+    return np.array(pil), len(crawl)*12
 
-    # TICKER
-    crawl = " | ".join([f"{a['event']} - {a['area']}" for a in alerts])
-    draw.rectangle((0,HEIGHT-60,WIDTH,HEIGHT), fill=(0,0,0))
-    draw.text((ticker_x, HEIGHT-45), crawl, FONT_MED, fill=(255,0,0))
-
-    return np.array(img), len(crawl) * 12
 
 # ------------------ MAIN LOOP ------------------
 def main():
