@@ -31,20 +31,7 @@ PRIORITY = {
     "High Wind Watch": 55,
     "Severe Thunderstorm Watch": 50
 }
-def generate_map_image(width=300, height=160):
-    """
-    Generate a static OpenStreetMap image of the USA with highlighted regions
-    Returns a PIL Image
-    """
-    m = StaticMap(width, height, url_template='http://a.tile.openstreetmap.org/{z}/{x}/{y}.png')
 
-    # Example markers: Oregon / Washington
-    m.add_marker(CircleMarker(( -120.5, 46.0), 'red', 12))  # approximate center
-    # Example markers: South Dakota / North Dakota / Minnesota
-    m.add_marker(CircleMarker((-100.0, 45.0), 'orange', 10))  # center plains
-
-    image = m.render()
-    return image
 # ---------------- TIME HELPERS ----------------
 def now_in(start, end):
     return start <= datetime.now() <= end
@@ -167,42 +154,55 @@ def fetch_noaa_alerts():
     alerts.sort(key=lambda x: x["severity"], reverse=True)
     return alerts
 
-# ---------------- DRAW FRAME ----------------
-def build_map_image(center_lat=40.0, center_lon=-100.0, zoom=6, width=250, height=160):
+# ---------------- HELPER: Convert lat/lon to tile numbers ----------------
+def deg2num(lat_deg, lon_deg, zoom):
+    lat_rad = math.radians(lat_deg)
+    n = 2.0 ** zoom
+    xtile = int((lon_deg + 180.0) / 360.0 * n)
+    ytile = int((1.0 - math.log(math.tan(lat_rad) + 1 / math.cos(lat_rad)) / math.pi) / 2.0 * n)
+    return xtile, ytile
+
+# ---------------- FETCH TILE ----------------
+def fetch_tile(x, y, zoom=6):
+    url = f"https://a.tile.openstreetmap.org/{zoom}/{x}/{y}.png"
+    resp = requests.get(url, timeout=5)
+    tile = Image.open(resp.raw).convert("RGB")
+    return tile
+
+# ---------------- BUILD MAP ----------------
+def build_map_image(width=250, height=160, center_lat=40.0, center_lon=-100.0, zoom=6):
+    """
+    Build a map overlay by stitching OSM tiles.
+    """
     cx, cy = deg2num(center_lat, center_lon, zoom)
     tiles = []
-    for dx in range(2):  # 2x2 tiles horizontally
-        for dy in range(2):  # 2x2 tiles vertically
-            tile = fetch_tile(cx+dx, cy+dy, zoom)
-            tiles.append(tile)
+    for dx in range(2):  # 2x2 tiles
+        for dy in range(2):
+            tiles.append(fetch_tile(cx+dx, cy+dy, zoom))
 
-    # Combine tiles
-    map_img = Image.new('RGB', (512, 512))  # 256px tiles × 2
+    map_img = Image.new("RGB", (512, 512))
     for i, tile in enumerate(tiles):
         x = (i % 2) * 256
         y = (i // 2) * 256
         map_img.paste(tile, (x, y))
 
-    # Resize to desired overlay size
     map_img = map_img.resize((width, height))
     return map_img
-    def latlon_to_pixel(lat, lon, img_width, img_height, bounds):
-    """Convert lat/lon to pixel coords within the map image"""
+
+# ---------------- DRAW ALERT MARKERS ----------------
+def latlon_to_pixel(lat, lon, img_width, img_height, bounds):
     min_lat, max_lat, min_lon, max_lon = bounds
     x = int((lon - min_lon) / (max_lon - min_lon) * img_width)
     y = int((max_lat - lat) / (max_lat - min_lat) * img_height)
     return x, y
 
 def add_alert_markers(map_img, alerts):
-    # Define rough bounds of map (USA)
-    bounds = (24.0, 50.0, -125.0, -66.0)  # min_lat, max_lat, min_lon, max_lon
-
+    bounds = (24.0, 50.0, -125.0, -66.0)  # continental USA approx
     draw = ImageDraw.Draw(map_img)
     for a in alerts:
         area = a['area']
         color = (255,0,0) if "Warning" in a['event'] else (255,140,0)
-
-        # Example coordinates for regions
+        # Approx coordinates
         if "Oregon" in area or "Washington" in area:
             x, y = latlon_to_pixel(46.0, -120.5, map_img.width, map_img.height, bounds)
         elif "South Dakota" in area:
@@ -213,12 +213,10 @@ def add_alert_markers(map_img, alerts):
             x, y = latlon_to_pixel(46.5, -93.0, map_img.width, map_img.height, bounds)
         else:
             continue
-
-        # Draw circle for alert
         draw.ellipse((x-6, y-6, x+6, y+6), fill=color)
-
     return map_img
 
+# ---------------- UPDATED DRAW FRAME ----------------
 def draw_frame(alerts, ticker_x):
     frame = np.zeros((HEIGHT, WIDTH, 3), dtype=np.uint8)
     pil = Image.fromarray(frame)
@@ -243,7 +241,7 @@ def draw_frame(alerts, ticker_x):
         draw.text((WIDTH-270,y),a['event'], font=FONT_SMALL, fill=(255,0,0))
         y += 24
 
-    # MAP OVERLAY (tiles + markers)
+    # MAP OVERLAY
     map_img = build_map_image(width=250, height=160)
     map_img = add_alert_markers(map_img, alerts)
     pil.paste(map_img,(WIDTH-270,280))
