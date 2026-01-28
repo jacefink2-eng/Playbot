@@ -41,22 +41,50 @@ def synthetic_alerts():
     OR_WA = "Oregon / Washington"
     PLAINS = "South Dakota / North Dakota / Minnesota"
 
-    if now_in(datetime(2026,1,27,18,0), datetime(2026,1,28,7,0)):
-        alerts.append({"event":"Hurricane Watch","area":OR_WA,"severity":PRIORITY["Hurricane Watch"]})
+    now = datetime.now()
 
-    if now_in(datetime(2026,1,28,10,5), datetime(2026,1,28,12,30)):
-        alerts.append({"event":"Hurricane Warning","area":OR_WA,"severity":PRIORITY["Hurricane Warning"]})
+    # 🌪️ Hurricane Watch
+    if datetime(2026, 1, 27, 18, 0) <= now <= datetime(2026, 1, 28, 7, 0):
+        alerts.append({
+            "event": "Hurricane Watch",
+            "area": OR_WA,
+            "severity": PRIORITY["Hurricane Watch"]
+        })
 
-    if now_in(datetime(2026,1,28,12,30), datetime(2026,1,28,18,0)):
-        alerts.append({"event":"Extreme Wind Warning","area":OR_WA,"severity":PRIORITY["Extreme Wind Warning"]})
+    # 🚨 Hurricane Warning
+    if datetime(2026, 1, 28, 10, 5) <= now <= datetime(2026, 1, 28, 12, 30):
+        alerts.append({
+            "event": "Hurricane Warning",
+            "area": OR_WA,
+            "severity": PRIORITY["Hurricane Warning"]
+        })
 
-    if now_in(datetime(2026,1,27,21,0), datetime(2026,1,28,10,0)):
-        alerts.append({"event":"High Wind Watch","area":PLAINS,"severity":PRIORITY["High Wind Watch"]})
+    # 💨 Extreme Wind Warning
+    if datetime(2026, 1, 28, 12, 30) <= now <= datetime(2026, 1, 28, 18, 0):
+        alerts.append({
+            "event": "Extreme Wind Warning",
+            "area": OR_WA,
+            "severity": PRIORITY["Extreme Wind Warning"]
+        })
 
-    if now_in(datetime(2026,1,28,10,25), datetime(2026,1,28,23,0)):
-        alerts.append({"event":"High Wind Warning","area":PLAINS,"severity":PRIORITY["High Wind Warning"]})
+    # 🌬️ High Wind Watch (Plains)
+    if datetime(2026, 1, 27, 21, 0) <= now <= datetime(2026, 1, 28, 10, 0):
+        alerts.append({
+            "event": "High Wind Watch",
+            "area": PLAINS,
+            "severity": PRIORITY["High Wind Watch"]
+        })
+
+    # ⚠️ High Wind Warning (Plains)
+    if datetime(2026, 1, 28, 10, 25) <= now <= datetime(2026, 1, 28, 23, 0):
+        alerts.append({
+            "event": "High Wind Warning",
+            "area": PLAINS,
+            "severity": PRIORITY["High Wind Warning"]
+        })
 
     return alerts
+
 
 # ---------------- START RTMP STREAM ----------------
 def start_stream():
