@@ -2,3 +2,8 @@ numpy
 Pillow
 requests
 ffmpeg-python
+folium
+selenium
+
+# If using ChromeDriver for headless rendering
+chromedriver-autoinstaller
