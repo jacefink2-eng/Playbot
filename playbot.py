@@ -61,12 +61,25 @@ def synthetic_alerts():
 # ---------------- START RTMP STREAM ----------------
 def start_stream():
     print("🚀 Starting Y’allBot RTMP stream (silent audio)...")
+
+    video = ffmpeg.input(
+        "pipe:",
+        format="rawvideo",
+        pix_fmt="rgb24",
+        s=f"{WIDTH}x{HEIGHT}",
+        framerate=FPS
+    )
+
+    audio = ffmpeg.input(
+        "anullsrc=channel_layout=stereo:sample_rate=44100",
+        format="lavfi"
+    )
+
     return (
         ffmpeg
-        .input("pipe:", format="rawvideo", pix_fmt="rgb24",
-               s=f"{WIDTH}x{HEIGHT}", framerate=FPS)
-        .input("anullsrc", format="lavfi")
         .output(
+            video,
+            audio,
             YOUTUBE_URL,
             format="flv",
             vcodec="libx264",
@@ -74,11 +87,12 @@ def start_stream():
             acodec="aac",
             audio_bitrate="128k",
             preset="veryfast",
-            g=FPS*2
+            g=FPS * 2
         )
         .overwrite_output()
         .run_async(pipe_stdin=True)
     )
+
 
 # ---------------- FETCH NOAA ALERTS ----------------
 def fetch_noaa_alerts():
