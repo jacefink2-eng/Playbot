@@ -2,4 +2,3 @@ numpy
 Pillow
 requests
 ffmpeg-python
-staticmap
