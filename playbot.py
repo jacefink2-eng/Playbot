@@ -89,12 +89,14 @@ def synthetic_alerts():
 def start_stream():
     print("🚀 Starting Y’allBot RTMP stream (silent audio)...")
 
+    # ---------------- FFmpeg Inputs ----------------
     video = ffmpeg.input(
         "pipe:",
         format="rawvideo",
         pix_fmt="rgb24",
         s=f"{WIDTH}x{HEIGHT}",
-        framerate=FPS
+        framerate=FPS,
+        re=None  # force realtime pacing at ffmpeg level
     )
 
     audio = ffmpeg.input(
@@ -102,6 +104,7 @@ def start_stream():
         format="lavfi"
     )
 
+    # ---------------- FFmpeg Output ----------------
     stream = (
         ffmpeg
         .output(
@@ -111,21 +114,50 @@ def start_stream():
             format="flv",
             vcodec="libx264",
             pix_fmt="yuv420p",
-            acodec="aac",
-            audio_bitrate="128k",
             preset="veryfast",
             g=FPS * 2,
             r=FPS,
-            vsync="cfr"
+            vsync="cfr",
+            acodec="aac",
+            audio_bitrate="128k"
         )
         .overwrite_output()
         .run_async(pipe_stdin=True)
     )
 
-    # 🔴 Kick YouTube out of "No data"
-    stream.stdin.write(np.zeros((HEIGHT, WIDTH, 3), dtype=np.uint8).tobytes())
+    # ---------------- Kick YouTube out of "No Data" ----------------
+    blank = np.zeros((HEIGHT, WIDTH, 3), dtype=np.uint8)
+    stream.stdin.write(blank.tobytes())
+    stream.stdin.flush()
 
-    return stream
+    print("🟢 Stream connected — entering realtime loop")
+
+    # ---------------- Realtime Frame Pacing ----------------
+    frame_interval = 1.0 / FPS
+    next_frame_time = time.time()
+
+    while True:
+        try:
+            # 🔧 Replace this with your actual frame renderer
+            frame = render_frame()  # MUST return np.uint8 (H,W,3)
+
+            stream.stdin.write(frame.tobytes())
+            stream.stdin.flush()
+
+            next_frame_time += frame_interval
+            sleep_time = next_frame_time - time.time()
+            if sleep_time > 0:
+                time.sleep(sleep_time)
+
+        except BrokenPipeError:
+            print("❌ FFmpeg pipe closed — stream ended")
+            break
+        except KeyboardInterrupt:
+            print("🛑 Stream stopped by user")
+            break
+
+    stream.stdin.close()
+    stream.wait()
 
 # ---------------- FETCH NOAA ALERTS ----------------
 def fetch_noaa_alerts():
@@ -180,7 +212,7 @@ def draw_frame(alerts, ticker_x):
     draw.rectangle((0,HEIGHT-60,WIDTH,HEIGHT), fill=(0,0,0))
     draw.text((ticker_x, HEIGHT-45), crawl, font=FONT_MED, fill=(255,0,0))
 
-    return np.array(pil), len(crawl)*12
+    return np.array(pil, dtype=np.uint8), len(crawl) * 12
 
 # ---------------- MAIN LOOP ----------------
 def main():
