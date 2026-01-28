@@ -8,7 +8,7 @@ from staticmap import StaticMap, CircleMarker
 
 # ---------------- SETTINGS ----------------
 WIDTH, HEIGHT = 1280, 720
-FPS = 5
+FPS = 60
 YOUTUBE_STREAM_KEY = ""
 YOUTUBE_URL = f"rtmp://a.rtmp.youtube.com/live2/fvgb-pzbe-4j7g-vej0-6g7q"
 
