@@ -4,9 +4,6 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 import ffmpeg
 from datetime import datetime
-import folium
-import io
-from selenium import webdriver
 
 # ---------------- SETTINGS ----------------
 WIDTH, HEIGHT = 1280, 720
@@ -88,7 +85,6 @@ def synthetic_alerts():
 
     return alerts
 
-
 # ---------------- START RTMP STREAM ----------------
 def start_stream():
     print("🚀 Starting Y’allBot RTMP stream (silent audio)...")
@@ -131,8 +127,6 @@ def start_stream():
 
     return stream
 
-
-
 # ---------------- FETCH NOAA ALERTS ----------------
 def fetch_noaa_alerts():
     alerts = []
@@ -156,37 +150,7 @@ def fetch_noaa_alerts():
     alerts.sort(key=lambda x: x["severity"], reverse=True)
     return alerts
 
-
-# ---------------- UPDATED DRAW FRAME ----------------
-def generate_map_image(alerts):
-    # Center map on USA
-    m = folium.Map(location=[39.8283, -98.5795], zoom_start=4)
-
-    # Example: overlay rectangles for alerts
-    for a in alerts:
-        if "Oregon" in a["area"]:
-            folium.Rectangle(bounds=[[42,-124],[46,-116]],
-                             color="red", fill=True, fill_opacity=0.5).add_to(m)
-        if "South Dakota" in a["area"]:
-            folium.Rectangle(bounds=[[43,-104],[46,-96]],
-                             color="orange", fill=True, fill_opacity=0.5).add_to(m)
-
-    # Save map as HTML
-    m.save("map.html")
-
-    # Render HTML to image using headless browser
-    options = webdriver.ChromeOptions()
-    options.headless = True
-    options.add_argument("--window-size=1280,720")
-    driver = webdriver.Chrome(options=options)
-    driver.get("file://" + os.path.abspath("map.html"))
-    driver.save_screenshot("map.png")
-    driver.quit()
-
-    img = Image.open("map.png").resize((WIDTH, HEIGHT))
-    return np.array(img)
-
-
+# ---------------- DRAW FRAME (NO MAP) ----------------
 def draw_frame(alerts, ticker_x):
     frame = np.zeros((HEIGHT, WIDTH, 3), dtype=np.uint8)
     pil = Image.fromarray(frame)
@@ -208,13 +172,8 @@ def draw_frame(alerts, ticker_x):
     draw.text((WIDTH-270,120),"Active Alerts", font=FONT_MED, fill=(255,255,255))
     y = 155
     for a in alerts[:6]:
-        draw.text((WIDTH-270,y),a['event'], font=FONT_SMALL, fill=(255,0,0))
+        draw.text((WIDTH-270,y), f"{a['event']} - {a['area']}", font=FONT_SMALL, fill=(255,0,0))
         y += 24
-
-    # MAP OVERLAY
-    map_img = build_map_image(width=250, height=160)
-    map_img = add_alert_markers(map_img, alerts)
-    pil.paste(map_img,(WIDTH-270,280))
 
     # TICKER
     crawl = " | ".join([f"{a['event']} - {a['area']}" for a in alerts])
@@ -222,9 +181,6 @@ def draw_frame(alerts, ticker_x):
     draw.text((ticker_x, HEIGHT-45), crawl, font=FONT_MED, fill=(255,0,0))
 
     return np.array(pil), len(crawl)*12
-
-
-
 
 # ---------------- MAIN LOOP ----------------
 def main():
