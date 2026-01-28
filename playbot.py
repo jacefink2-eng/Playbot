@@ -4,6 +4,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 import ffmpeg
 from datetime import datetime
+from staticmap import StaticMap, CircleMarker
 
 # ---------------- SETTINGS ----------------
 WIDTH, HEIGHT = 1280, 720
@@ -30,7 +31,20 @@ PRIORITY = {
     "High Wind Watch": 55,
     "Severe Thunderstorm Watch": 50
 }
+def generate_map_image(width=300, height=160):
+    """
+    Generate a static OpenStreetMap image of the USA with highlighted regions
+    Returns a PIL Image
+    """
+    m = StaticMap(width, height, url_template='http://a.tile.openstreetmap.org/{z}/{x}/{y}.png')
 
+    # Example markers: Oregon / Washington
+    m.add_marker(CircleMarker(( -120.5, 46.0), 'red', 12))  # approximate center
+    # Example markers: South Dakota / North Dakota / Minnesota
+    m.add_marker(CircleMarker((-100.0, 45.0), 'orange', 10))  # center plains
+
+    image = m.render()
+    return image
 # ---------------- TIME HELPERS ----------------
 def now_in(start, end):
     return start <= datetime.now() <= end
@@ -154,20 +168,24 @@ def fetch_noaa_alerts():
     return alerts
 
 # ---------------- DRAW FRAME ----------------
+# ---------------- DRAW FRAME ----------------
 def draw_frame(alerts, ticker_x):
     frame = np.zeros((HEIGHT, WIDTH, 3), dtype=np.uint8)
     pil = Image.fromarray(frame)
     draw = ImageDraw.Draw(pil)
 
+    # ---------------- HEADER ----------------
     draw.rectangle((0, 0, WIDTH, 40), fill=(0, 0, 0))
     draw.text((10, 5), "PlayBot 24/7 USA Weather Alerts", font=FONT_LARGE, fill=(255,255,255))
 
+    # ---------------- TOP ALERT ----------------
     if alerts:
         top = alerts[0]
         color = (255,0,0) if "Warning" in top["event"] else (255,140,0)
         draw.rectangle((0, 50, WIDTH, 100), fill=color)
         draw.text((10, 55), f"{top['event']} — {top['area']}", font=FONT_MED, fill=(0,0,0))
 
+    # ---------------- ACTIVE ALERTS BOX ----------------
     draw.rectangle((WIDTH-280, 110, WIDTH-10, 270), fill=(20,20,20))
     draw.text((WIDTH-270, 120), "Active Alerts", font=FONT_MED, fill=(255,255,255))
 
@@ -176,11 +194,17 @@ def draw_frame(alerts, ticker_x):
         draw.text((WIDTH-270, y), a["event"], font=FONT_SMALL, fill=(255,0,0))
         y += 24
 
+    # ---------------- MAP ----------------
+    map_img = generate_map_image(alerts, width=250, height=160)
+    pil.paste(map_img, (WIDTH-270, 280))
+
+    # ---------------- SCROLLING TICKER ----------------
     crawl = " | ".join([f"{a['event']} - {a['area']}" for a in alerts])
     draw.rectangle((0, HEIGHT-60, WIDTH, HEIGHT), fill=(0,0,0))
     draw.text((ticker_x, HEIGHT-45), crawl, font=FONT_MED, fill=(255,0,0))
 
     return np.array(pil), len(crawl)*12
+
 
 # ---------------- MAIN LOOP ----------------
 def main():
