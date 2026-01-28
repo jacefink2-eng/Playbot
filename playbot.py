@@ -110,7 +110,7 @@ def draw_frame(alerts, ticker_x):
     draw = ImageDraw.Draw(pil)
 
     draw.rectangle((0, 0, WIDTH, 40), fill=(0, 0, 0))
-    draw.text((10, 5), "Y’allBot 24/7 USA Weather Alerts", font=FONT_LARGE, fill=(255,255,255))
+    draw.text((10, 5), "PlayBot 24/7 USA Weather Alerts", font=FONT_LARGE, fill=(255,255,255))
 
     if alerts:
         top = alerts[0]
